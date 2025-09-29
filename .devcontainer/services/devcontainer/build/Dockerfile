@@ -2,18 +2,17 @@ FROM debian:bullseye
 
 # Temel paketlerin kurulumu, Java 17, Maven, Docker CLI kurulumu
 RUN apt-get update && apt-get install -y \
-    jq watch \
+    jq \
+    watch \
     ca-certificates \
-    bash-completion curl \
+    bash-completion \
+    curl \
     gnupg \
     lsb-release \
     git \
     unzip \
-    vim \
-    iproute2 \
-    iputils-ping \
-    net-tools \
-    dnsutils \
+    vim nano \
+    iproute2 iputils-ping net-tools dnsutils ncat \
     openjdk-17-jdk \
     maven && \
     # Docker CLI kurulumu
@@ -31,9 +30,24 @@ RUN apt-get update && apt-get install -y \
     apt-get update && \
     apt-get install -y docker-ce-cli docker-buildx-plugin docker-compose-plugin
 
-RUN curl -fsSL https://raw.githubusercontent.com/docker/cli/master/contrib/completion/bash/docker -o /etc/bash_completion.d/docker.sh \
-    && echo "source /etc/bash_completion.d/docker.sh" >> /etc/bash.bashrc
+# RUN cat <<EOT >> /etc/bash.bashrc
+# if [ -f /etc/bash_completion ]; then
+#     . /etc/bash_completion
+# fi
+# EOT
 
+# RUN docker completion bash > /etc/bash_completion.d/docker.sh \
+#     && echo "source /etc/bash_completion.d/docker.sh" >> /etc/bash.bashrc
+
+# Tüm kullanıcıların terminallerinde etkili olsun diye /etc/bash_completion.d/ dizininde
+RUN docker completion bash > /etc/bash_completion.d/docker.sh
+# Tüm kullanıcıların terminallerinde etkili olsun diye /etc/bash.bashrc
+RUN cat <<EOT >> /etc/bash.bashrc
+if [ -f /etc/bash_completion ]; then
+    . /etc/bash_completion
+fi
+source /etc/bash_completion.d/docker.sh
+EOT
 
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
