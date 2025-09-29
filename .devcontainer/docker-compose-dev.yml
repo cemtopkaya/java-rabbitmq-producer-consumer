@@ -1,0 +1,40 @@
+# http://localhost:15672 # RabbitMQ Management UI
+# producer: http://localhost:8081/messages
+# consumer: http://localhost:8082
+#
+# curl -X POST -H "Content-Type: application/json" -d '{"message":"Hello, World!"}' http://localhost:8081/messages
+name: rabbit-java
+
+services:
+  rabbitmq_devcontainer:
+    image: maven-3.8.3-openjdk-17-did
+    build:
+      context: services/devcontainer/build
+      dockerfile: Dockerfile
+    command: sleep infinity
+    container_name: rabbitmq_devcontainer
+    env_file: .env
+    ports:
+      - '8080:8080'
+      - '8081:8081'
+      - '8082:8082'
+    environment:
+      COMPOSE_PROJECT_NAME: 'rabbit-java'
+    volumes:
+      # Mount the project directory to the same path as on host
+      - ${WORKSPACE_PATH_ON_HOST}:${WORKSPACE_PATH_ON_HOST}:cached
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.ssh:/root/.ssh:ro
+      - ~/.gitconfig:/root/.gitconfig:ro
+
+  rabbitmq:
+    image: rabbitmq:3.8-management
+    ports:
+      - '5672:5672'
+      # http://localhost:15672 # RabbitMQ Management UI
+      - '15672:15672'
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'check_port_connectivity']
+      interval: 5s
+      timeout: 10s
+      retries: 5
