@@ -16,6 +16,6 @@ public class ConsumerListener {
 
     @RabbitListener(queues = "${rabbitmq.queue.name}")
     public void listen(String message) {
-        logger.info("Received on " + queueName + ": " + message);
+        logger.fine("Received on " + queueName + ": " + message);
     }
 }

@@ -29,6 +29,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.8-management
+    container_name: rabbit
     ports:
       - '5672:5672'
       # http://localhost:15672 # RabbitMQ Management UI

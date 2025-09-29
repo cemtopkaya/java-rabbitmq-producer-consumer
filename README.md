@@ -1,18 +1,129 @@
 # RabbitMQ Java Örneği
 
+## Hızlı Komutlar
+
 http://localhost:15672 # RabbitMQ Management UI
 producer: http://localhost:8081/messages
 consumer: http://localhost:8082
 
-Send message to producer:
+RabbitMQ hizmetini yeniden başlatalım, taze başlangıç için:
+
+```sh
+docker compose -f .devcontainer/docker-compose-dev.yml down rabbitmq
+docker compose -f .devcontainer/docker-compose-dev.yml up -d rabbitmq
+```
+
+Projeyi derleyip producer ve consumer'ı ayaklandıralım:
+
+```sh
+mvn clean install
+
+cd producer-service
+mvn spring-boot:run 1>/dev/null &
+
+cd ../consumer-service
+mvn spring-boot:run 1>/dev/null &
+```
+
+Kuyruk işlemleri yapalım:
+
+```sh
+ctr=rabbit
+
+# Kuyrukları listele
+docker exec -it $ctr rabbitmqctl list_queues
+
+# Producer'ın uç noktasına istek yapalım arkada kuyruk oluşsun, mesaj yazılsın
+curl -vvv -X POST http://localhost:8081/messages \
+ -H "Content-Type: application/json" \
+ -d '{"message":"Hello, World!"}'
+
+# Kuyrukları listele
+docker exec -it $ctr rabbitmqctl list_queues
+```
 
 ```sh
 curl -vvv -X POST http://localhost:8081/messages \
     -H "Content-Type: application/json" \
-    -d '{"message":"Hello, World!"}'
+    -d '{"message":"Hello, Mars!"}'
+```
+
+Kuyruktan mesajı oku:
+
+```sh
+docker exec -it $ctr rabbitmqadmin get queue=my-test-queue count=1 ackmode=ack_requeue_false
 ```
 
 # Kuyruk
+
+## RabbitMQ Konsol Komutları
+
+```sh
+ctr=rabbit  # RabbitMQ konteyner adı
+
+# Kuyrukları listeleme
+docker exec -it $ctr rabbitmqctl list_queues
+
+# Kuyruk oluşturma
+docker exec -it $ctr rabbitmqadmin declare queue name=benim-kuyruum durable=true
+
+# Kuyruk detaylarını görmek için (durable, mesaj sayısı gibi) rabbitmqctl ile:
+docker exec -it $ctr rabbitmqctl list_queues name durable messages
+```
+
+Kuyruk özelliklerini değiştirme (örnek: durable özelliği değiştirme için önce silip yeniden oluşturulmalı)
+
+```sh
+ctr=rabbit  # RabbitMQ konteyner adı
+
+# RabbitMQ'da doğrudan özellik değiştirme yok, kuyruk silinir
+docker exec -it $ctr rabbitmqadmin delete queue name=benim-kuyruum
+
+# ve yeni özelliklerle tekrar oluşturulur:
+docker exec -it $ctr rabbitmqadmin declare queue name=benim-kuyruum durable=false
+```
+
+## RabbitMQ Soyut Nesneleri
+
+RabbitMQ’nun gerçek yapı taşlarının Java’daki nesne karşılıkları olan Queue, Exchange ve Binding kavramlarını birazdan göreceğiz ama önce Spring içinde nasıl tanımlandıklarına bakalım:
+
+```java
+@Bean
+public Queue myQueue() {
+    return new Queue("my-queue", true);
+}
+
+@Bean
+public DirectExchange myExchange() {
+    return new DirectExchange("my-exchange");
+}
+
+@Bean
+public Binding myBinding(Queue myQueue, DirectExchange myExchange) {
+    return BindingBuilder.bind(myQueue).to(myExchange).with("routing-key");
+}
+```
+
+RabbitMQ’nun soyut nesneleri, yani broker üzerinde var olan yapıların Java karşılıkları:
+
+### Queue (Kuyruk):
+
+Mesajların yazıldığı kutu (örn. email-queue, sms-queue). Tüketici uygulamalar gelip bu kutulardan mesajları çekerler.
+
+### Exchange (Değişim noktası):
+
+Mesajı alır, kuralına göre bir veya birden fazla kuyruğa yönlendirir.
+
+Exchange Türleri:
+
+1. _direct_ : tam eşleşme (routing key ile).
+1. _fanout_ : herkese dağıt (broadcast).
+1. _topic_ : joker karakterlerle eşleşme (user.\*, order.#).
+1. _headers_ : mesajın header bilgisine göre.
+
+### Binding (Bağlama):
+
+Exchange ile Queue arasındaki köprü (“Bu kuyruğu şu exchange’e şu routing key ile bağla”).
 
 ## RabbitMQ Kuyruğu
 
@@ -39,7 +150,11 @@ RabbitMQ kuyruk oluşturma parametreleri:
   - `x-max-length` : kuyruğun maksimum mesaj sayısı.
   - `x-dead-letter-exchange` : ölen mesajları yönlendireceği exchange.
 
-RabbitMQ’da **kuyruk/ekleme işlerinde** aslında 2 farklı tanımlama yöntemi vardır.
+RabbitMQ’da **kuyruk/ekleme işlerinde** aslında 3 farklı tanımlama yöntemi vardır.
+
+- **Passive** en sıkı bağımlılık (önceden kuyruğu tanımlamak zorundasın).
+- **Active** parametrelerde uzlaşma şartıyla orta seviye bağımlılık.
+- **Server-named** en gevşek bağımlılık, producer kuyruğun adını bilmez, sadece exchange’e publish eder.
 
 1.  **Passive Declare (`queueDeclarePassive`)** : Hiçbir şey oluşturmaz, sadece doğrulama yapar.
     _Kullanım yeri:_ Kuyruğun önceden tanımlı olmasının beklendiği senaryolar (ör. sistemler arası sıkı anlaşma/protokol).
@@ -68,3 +183,56 @@ RabbitMQ’da **kuyruk/ekleme işlerinde** aslında 2 farklı tanımlama yöntem
 - RabbitMQ bu durumlarda bağlı channel’ı kapatır.
 - Channel kapanınca client kütüphanesi (com.rabbitmq.client) ShutdownSignalException fırlatır.
 - İçindeki reply-code ve reply-text sana broker’ın nedenini anlatır.
+
+Tek bir java dosyasında uygulama çalışsın ve "kuyruk oluştur, mesajı bas" senaryosunu gör diye çirkin ama çalışan kod yazalım:
+
+```java
+package com.example.producer;
+
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ApplicationContext;
+
+import java.time.LocalDateTime;
+
+@SpringBootApplication
+public class ProducerApplication implements CommandLineRunner {
+
+    private final ApplicationContext context;
+
+    public ProducerApplication(ApplicationContext context) {
+        this.context = context;
+    }
+
+    public static void main(String[] args) {
+        SpringApplication.run(ProducerApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) {
+        // Spring IoC ile otomatik verebilecekken bu şekilde de olabilir:
+        // Spring context içinden ihtiyacımız olan bean’leri çekiyoruz
+        ConnectionFactory connectionFactory = context.getBean(ConnectionFactory.class);
+        RabbitTemplate rabbitTemplate = context.getBean(RabbitTemplate.class);
+
+        // Kuyruğu programatik olarak oluştur
+        String queueName = "time-queue";
+        Queue queue = new Queue(queueName, true); // durable = true
+
+        // Kuyruğu broker’a declare et
+        connectionFactory.createConnection()
+                         .createChannel(false)
+                         .queueDeclare(queue.getName(), true, false, false, null);
+
+        // Kuyruğa mesaj gönder
+        String message = "Current time: " + LocalDateTime.now();
+        rabbitTemplate.convertAndSend(queueName, message);
+
+        System.out.println(" [x] Sent: " + message);
+    }
+}
+```

@@ -1,0 +1,10 @@
+consumer-service/target/classes/com/example/consumer/ConsumerListener.class
+consumer-service/target/classes/com/example/consumer/ConsumerServiceApplication.class
+producer-service/target/producer-service-1.0.0-SNAPSHOT.jar
+producer-service/target/producer-service-1.0.0-SNAPSHOT.jar.original
+producer-service/target/classes/com/example/producer/ProducerConfig.class
+producer-service/target/classes/com/example/producer/ProducerController.class
+producer-service/target/classes/com/example/producer/ProducerServiceApplication.class
+producer-service/target/maven-archiver/pom.properties
+producer-service/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+producer-service/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
