@@ -62,6 +62,28 @@ docker exec -it $ctr rabbitmqadmin get queue=my-test-queue count=1 ackmode=ack_r
 
 ## Kuyruk
 
+1. RabbitMQ Bağlantı Bilgileri
+
+- spring.rabbitmq.host: RabbitMQ sunucusunun IP adresi veya host adı.
+- spring.rabbitmq.port: RabbitMQ sunucusunun bağlantı portu (genellikle 5672).
+- spring.rabbitmq.username: RabbitMQ sunucusuna bağlanmak için kullanılan kullanıcı adı.
+- spring.rabbitmq.password: RabbitMQ sunucusuna bağlanmak için kullanılan şifre.
+
+Bu bilgiler, RabbitMQ sunucusuna bağlanmak için gereklidir.
+
+2. RabbitMQ Kuyruk ve Exchange Yapılandırması
+
+- eqm.rabbitmq.queue: Uygulamanın mesajları okumak veya yazmak için kullanacağı kuyruğun adı.
+- eqm.rabbitmq.exchange: Mesajların gönderileceği veya okunacağı exchange'in adı.
+- eqm.rabbitmq.routingKey: Mesajların hangi kuyruğa yönlendirileceğini belirleyen anahtar.
+
+Bu yapılandırma, RabbitMQ'daki kuyruk ve exchange yapısını tanımlar.
+
+3. Dağıtım ve Bölümleme Yapılandırması
+
+- simple.distribute: Mesajların basit bir şekilde dağıtılıp dağıtılmayacağını belirleyen bir bayrak (flag). false ise, mesajlar belirli bir mantığa göre dağıtılır. true ise, basit bir dağıtım stratejisi kullanılır.
+- partition.number: Kuyrukların kaç parçaya bölüneceğini belirleyen sayı. Örneğin, 2 ise, mesajlar 2 farklı kuyruğa dağıtılır.
+
 ### RabbitMQ Konsol Komutları
 
 ```sh
